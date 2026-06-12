@@ -1,73 +1,77 @@
-# React + TypeScript + Vite
+# BookBridge - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+BookBridge is a modern, responsive web application designed for a book exchange marketplace. It enables users to trade, request, and manage books seamlessly while providing features like real-time messaging, wishlists, and dispute resolution.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Authentication:** Secure user login and signup flows, including OAuth callbacks.
+- **Marketplace & Home:** Browse available books and recent additions.
+- **Book Details:** View comprehensive information about specific books.
+- **Inventory Management:** Users can manage the books they are offering.
+- **Wishlist:** Keep track of books you want to read or acquire.
+- **Requests System:** Send, receive, and manage book exchange requests.
+- **Messaging:** Communicate with other users regarding trades.
+- **User Profiles:** Manage personal information and settings.
+- **Dispute Resolution:** Built-in system for handling and resolving exchange disputes.
+- **Admin Dashboard:** Administrative controls for platform management.
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Framework:** [React 19](https://react.dev/)
+- **Build Tool:** [Vite](https://vitejs.dev/)
+- **Language:** [TypeScript](https://www.typescriptlang.org/)
+- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
+- **Routing:** [React Router v7](https://reactrouter.com/)
+- **State & Data Fetching:** [TanStack React Query](https://tanstack.com/query/latest)
+- **HTTP Client:** [Axios](https://axios-http.com/)
+- **Icons:** [Lucide React](https://lucide.dev/)
 
-## Expanding the ESLint configuration
+## Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Before you begin, ensure you have the following installed:
+- Node.js (v18 or higher recommended)
+- npm or yarn
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Getting Started
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+2. **Environment Variables:**
+   Create a `.env` file in the root of the `frontend` directory and configure the necessary environment variables. (e.g., API base URL). *Note: Ensure you do not commit any secret keys or sensitive information.*
+
+3. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+   The application will typically be available at `http://localhost:5173`.
+
+## Scripts
+
+- `npm run dev`: Starts the local development server with Hot Module Replacement (HMR).
+- `npm run build`: Compiles TypeScript and builds the app for production.
+- `npm run lint`: Runs ESLint to catch code issues.
+- `npm run preview`: Bootstraps a local web server to preview the production build.
+
+## Project Structure
+
 ```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+frontend/
+├── public/           # Static assets
+├── src/
+│   ├── api/          # API integration and Axios setup
+│   ├── assets/       # Images, icons, and fonts
+│   ├── components/   # Reusable UI components and layouts
+│   ├── context/      # React Contexts (e.g., AuthContext)
+│   ├── pages/        # Application routes/pages
+│   ├── App.tsx       # Main application component and routing setup
+│   ├── main.tsx      # Application entry point
+│   └── index.css     # Global styles and Tailwind directives
+├── .env              # Environment variables (git-ignored)
+├── package.json      # Project dependencies and scripts
+├── tailwind.config.js# Tailwind CSS configuration
+├── tsconfig.json     # TypeScript configuration
+└── vite.config.ts    # Vite configuration
 ```

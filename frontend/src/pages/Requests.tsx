@@ -66,29 +66,7 @@ export const Requests: React.FC = () => {
         return Array.isArray(response.data) ? response.data : (response.data.requests || []);
       } catch (err) {
         console.error(err);
-        // Fallback mockup
-        return [
-          {
-            _id: 'r1',
-            book: { _id: 'book1', title: 'Introduction to Algorithms (CLRS)', author: 'Thomas Cormen', price: 45, type: 'Sell' },
-            buyer: { _id: 'buyer1', name: 'Alice Walker', rating: 4.6 },
-            seller: { _id: 'myuser', name: 'Me' },
-            status: 'Pending',
-            proposedPrice: 40,
-            message: 'Would you be willing to do $40 for the CLRS book?',
-            createdAt: new Date().toISOString()
-          },
-          {
-            _id: 'r2',
-            book: { _id: 'book2', title: 'Calculus: Early Transcendentals', author: 'James Stewart', price: 0, type: 'Exchange' },
-            buyer: { _id: 'myuser', name: 'Me' },
-            seller: { _id: 'seller1', name: 'Bob Harris', rating: 4.3 },
-            status: 'Negotiating',
-            offeredBook: { _id: 'mybook1', title: 'Linear Algebra', author: 'David Lay', price: 0, type: 'Exchange' },
-            message: 'I want to trade my Linear Algebra book for your Calculus book.',
-            createdAt: new Date(Date.now() - 3600000).toISOString()
-          }
-        ];
+        throw err;
       }
     }
   });
@@ -102,17 +80,7 @@ export const Requests: React.FC = () => {
         const response = await api.get(`/negotiations/${negotiationRequest?._id}`);
         return Array.isArray(response.data) ? response.data : (response.data.negotiations || []);
       } catch (err) {
-        // Fallback mock history
-        return [
-          {
-            _id: 'h1',
-            sender: negotiationRequest?.buyer || { _id: 'buyer', name: 'Alice Walker' },
-            message: negotiationRequest?.message || 'Original proposal message',
-            proposedPrice: negotiationRequest?.proposedPrice,
-            offeredBook: negotiationRequest?.offeredBook,
-            createdAt: negotiationRequest?.createdAt || new Date().toISOString()
-          }
-        ];
+        throw err;
       }
     }
   });
@@ -155,7 +123,7 @@ export const Requests: React.FC = () => {
     }
   });
 
-  // Separate incoming and outgoing (we check if seller._id is user.id, but since we might not have user object loaded in some mock setups, let's look at buyer/seller name)
+  // Separate incoming and outgoing (we check if seller._id is user.user_id, but since we might not have user object loaded in some mock setups, let's look at buyer/seller name)
   const incoming = requests?.filter(r => r.seller._id !== 'myuser' && r.seller.name !== 'Me') || [];
   const outgoing = requests?.filter(r => r.buyer._id === 'myuser' || r.buyer.name === 'Me') || [];
 
@@ -223,8 +191,8 @@ export const Requests: React.FC = () => {
           <p className="mt-2 text-sm text-slate-600">Please try again later.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          const activeList = activeTab === 'incoming' ? incoming : outgoing;
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className={`space-y-4 ${negotiationRequest ? 'lg:col-span-5' : 'lg:col-span-12'}`}>
           {((activeTab === 'incoming' ? incoming : outgoing).length === 0) ? (
             <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl shadow-sm">
               <Clock className="mx-auto h-12 w-12 text-slate-300" />
@@ -320,12 +288,10 @@ export const Requests: React.FC = () => {
             ))
           )}
         </div>
-      )}
 
       {/* Negotiation Slide-out/Modal */}
       {negotiationRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-950/40 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white h-screen shadow-2xl flex flex-col justify-between border-l border-slate-100 animate-fade-in">
+        <div className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[70vh] sticky top-6 overflow-hidden animate-fade-in">
             {/* Header */}
             <div className="p-6 border-b border-slate-150 flex justify-between items-start">
               <div>
@@ -436,6 +402,7 @@ export const Requests: React.FC = () => {
               </div>
             )}
           </div>
+        )}
         </div>
       )}
     </div>

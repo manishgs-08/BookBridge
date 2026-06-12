@@ -39,23 +39,7 @@ export const Wishlist: React.FC = () => {
         return list.filter((item: any) => item.book);
       } catch (err) {
         console.error(err);
-        // Fallback mockup
-        return [
-          {
-            _id: 'w1',
-            createdAt: new Date().toISOString(),
-            book: {
-              _id: 'book1',
-              title: 'Introduction to Algorithms (CLRS)',
-              author: 'Thomas H. Cormen, Charles E. Leiserson',
-              condition: 'Very Good',
-              price: 45,
-              type: 'Sell',
-              image: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=400',
-              owner: { _id: 'owner1', name: 'John Doe' }
-            }
-          }
-        ];
+        throw err;
       }
     }
   });

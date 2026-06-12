@@ -15,7 +15,7 @@ export const Signup: React.FC = () => {
   }, [searchParams]);
 
   const handleGoogleLogin = () => {
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+    const backendUrl = import.meta.env.VITE_API_URL || 'https://bookbridge-production-68a5.up.railway.app/api';
     // Redirect browser directly to Google OAuth initiation endpoint
     window.location.href = `${backendUrl}/auth/google`;
   };

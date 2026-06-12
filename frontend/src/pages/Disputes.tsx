@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
-import { ShieldAlert, Send, ArrowLeft, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ShieldAlert, Send, AlertCircle } from 'lucide-react';
+import { BackButton } from '../components/BackButton';
 import api from '../api/axios';
 
 export const Disputes: React.FC = () => {
@@ -27,10 +28,8 @@ export const Disputes: React.FC = () => {
       alert('Your dispute has been filed successfully. An administrator will review your claim shortly.');
       navigate('/');
     },
-    onError: () => {
-      // Mock validation success on offline backend sandbox
-      alert('Dispute submitted successfully (offline test mode)!');
-      navigate('/');
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Failed to submit dispute report.');
     }
   });
 
@@ -42,9 +41,7 @@ export const Disputes: React.FC = () => {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Back Link */}
-      <Link to="/profile" className="inline-flex items-center text-sm font-semibold text-slate-655 hover:text-slate-950 transition">
-        <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Profile
-      </Link>
+      <BackButton />
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm space-y-6">
         <div className="flex items-center space-x-3 pb-4 border-b border-slate-100">

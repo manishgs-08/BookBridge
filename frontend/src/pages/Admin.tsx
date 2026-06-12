@@ -67,18 +67,7 @@ export const Admin: React.FC = () => {
         return Array.isArray(response.data) ? response.data : (response.data.disputes || []);
       } catch (err) {
         console.error(err);
-        // Fallback mockup
-        return [
-          {
-            _id: 'disp1',
-            title: 'No-show for calculus book swap',
-            description: 'The student Sarah Miller agreed to meet at the campus square at 2 PM but did not show up and blocked my messages.',
-            reportedUser: 'Sarah Miller',
-            reporter: { name: 'Alice Walker' },
-            status: 'Pending',
-            createdAt: new Date().toISOString()
-          }
-        ];
+        throw err;
       }
     }
   });
@@ -92,10 +81,7 @@ export const Admin: React.FC = () => {
         return Array.isArray(response.data) ? response.data : (response.data.users || []);
       } catch (err) {
         console.error(err);
-        return [
-          { _id: 'u1', name: 'Alice Walker', email: 'alice@university.edu', role: 'student', isBlocked: false, createdAt: new Date().toISOString() },
-          { _id: 'u2', name: 'Sarah Miller', email: 'sarah@university.edu', role: 'student', isBlocked: false, createdAt: new Date().toISOString() }
-        ];
+        throw err;
       }
     }
   });
@@ -109,9 +95,7 @@ export const Admin: React.FC = () => {
         return Array.isArray(response.data) ? response.data : (response.data.books || []);
       } catch (err) {
         console.error(err);
-        return [
-          { _id: 'b1', title: 'Algorithms CLRS', author: 'Cormen', category: 'Computer Science', price: 45, type: 'Sell', owner: { name: 'Sarah Miller' } }
-        ];
+        throw err;
       }
     }
   });
@@ -126,7 +110,7 @@ export const Admin: React.FC = () => {
       alert('Dispute status updated successfully!');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Action executed successfully (offline demo mode).');
+      alert(err.response?.data?.message || 'Failed to update dispute status.');
     }
   });
 
@@ -140,7 +124,7 @@ export const Admin: React.FC = () => {
       alert('User access status updated successfully!');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'User block status updated (offline demo mode).');
+      alert(err.response?.data?.message || 'Failed to update user block status.');
     }
   });
 
@@ -154,7 +138,7 @@ export const Admin: React.FC = () => {
       alert('Listing removed successfully!');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Listing removed (offline demo mode).');
+      alert(err.response?.data?.message || 'Failed to remove listing.');
     }
   });
 

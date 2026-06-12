@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit2, Trash2, BookOpen, AlertCircle, X, Check } from 'lucide-react';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 interface Book {
   _id: string;
@@ -14,7 +16,7 @@ interface Book {
   type: 'Sell' | 'Exchange' | 'Free';
   exchangeFor?: string;
   image?: string;
-  status: 'Available' | 'Pending' | 'Exchanged' | 'Sold';
+  status: 'Available' | 'Reserved' | 'Exchanged' | 'Sold';
   description?: string;
 }
 
@@ -40,7 +42,16 @@ const CONDITIONS = [
 ];
 
 export const Inventory: React.FC = () => {
+  const { isVerifiedSeller, user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Temporary debugging - remove after verification
+  console.log('Inventory Auth Check', {
+    role: user?.role,
+    seller_verified: user?.seller_verified,
+    isVerifiedSeller,
+    user,
+  });
   
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
@@ -52,10 +63,14 @@ export const Inventory: React.FC = () => {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [condition, setCondition] = useState(CONDITIONS[2]); // Very Good
   const [type, setType] = useState<'Sell' | 'Exchange' | 'Free'>('Sell');
-  const [price, setPrice] = useState<number>(0);
+  const [price, setPrice] = useState<number | string>('');
   const [exchangeFor, setExchangeFor] = useState('');
   const [image, setImage] = useState('');
   const [description, setDescription] = useState('');
+
+  // Form error states
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Fetch my inventory
   const { data: myBooks, isLoading, isError } = useQuery<Book[]>({
@@ -66,36 +81,7 @@ export const Inventory: React.FC = () => {
         return Array.isArray(response.data) ? response.data : (response.data.books || []);
       } catch (err) {
         console.error(err);
-        // Fallback mock inventory items
-        return [
-          {
-            _id: 'mybook1',
-            title: 'Linear Algebra and Its Applications',
-            author: 'David C. Lay',
-            isbn: '9780321385178',
-            category: 'Mathematics',
-            condition: 'Like New',
-            price: 35,
-            type: 'Sell',
-            status: 'Available',
-            description: 'Essential linear algebra book. Excellent condition.',
-            image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=400'
-          },
-          {
-            _id: 'mybook2',
-            title: 'Physics for Scientists and Engineers',
-            author: 'Serway & Jewett',
-            isbn: '9781133947271',
-            category: 'Physics',
-            condition: 'Good',
-            price: 0,
-            type: 'Exchange',
-            exchangeFor: 'Calculus early transcendentals',
-            status: 'Available',
-            description: 'Used for General Physics I and II.',
-            image: 'https://images.unsplash.com/photo-1495640388908-05fa85288e61?auto=format&fit=crop&q=80&w=400'
-          }
-        ];
+        throw err;
       }
     }
   });
@@ -108,10 +94,12 @@ export const Inventory: React.FC = () => {
     setCategory(CATEGORIES[0]);
     setCondition(CONDITIONS[2]);
     setType('Sell');
-    setPrice(0);
+    setPrice('');
     setExchangeFor('');
     setImage('');
     setDescription('');
+    setFormError(null);
+    setFieldErrors({});
     setModalOpen(true);
   };
 
@@ -127,12 +115,20 @@ export const Inventory: React.FC = () => {
     setExchangeFor(book.exchangeFor || '');
     setImage(book.image || '');
     setDescription(book.description || '');
+    setFormError(null);
+    setFieldErrors({});
     setModalOpen(true);
   };
 
   // Mutation to add/edit book
   const submitMutation = useMutation({
     mutationFn: async () => {
+      let parsedPrice = 0;
+      if (type === 'Sell') {
+        const p = parseFloat(String(price));
+        parsedPrice = isNaN(p) ? 0 : p;
+      }
+      
       const payload = {
         title,
         author,
@@ -140,11 +136,15 @@ export const Inventory: React.FC = () => {
         category,
         condition,
         type,
-        price: type === 'Sell' ? price : 0,
+        asking_price: parsedPrice,
         exchangeFor: type === 'Exchange' ? exchangeFor : undefined,
         image: image || undefined,
         description: description || undefined
       };
+
+      console.log("Create Book Payload:", payload);
+      console.log("asking_price:", payload.asking_price);
+      console.log("Type:", typeof payload.asking_price);
 
       if (editingBook) {
         return api.put(`/books/${editingBook._id}`, payload);
@@ -156,9 +156,20 @@ export const Inventory: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['my-inventory'] });
       queryClient.invalidateQueries({ queryKey: ['books'] });
       setModalOpen(false);
+      setFormError(null);
+      setFieldErrors({});
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Error occurred while saving listing.');
+      const msg = err.response?.data?.message || 'Error occurred while saving listing.';
+      
+      // Inline UX error routing
+      if (msg.toLowerCase().includes('asking price')) {
+        setFieldErrors({ price: msg });
+        setFormError(null);
+      } else {
+        setFormError(msg);
+        setFieldErrors({});
+      }
     }
   });
 
@@ -178,6 +189,8 @@ export const Inventory: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    setFieldErrors({});
     submitMutation.mutate();
   };
 
@@ -186,6 +199,24 @@ export const Inventory: React.FC = () => {
       deleteMutation.mutate(id);
     }
   };
+
+  if (!isVerifiedSeller) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4">
+        <AlertCircle className="h-12 w-12 text-rose-500" />
+        <h2 className="font-display text-2xl font-bold text-slate-900">Access Denied</h2>
+        <p className="text-sm text-slate-500 text-center max-w-md">
+          You must be a verified seller to list textbooks in your inventory.
+        </p>
+        <Link 
+          to="/profile" 
+          className="mt-4 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 transition"
+        >
+          Verify as Seller
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -313,6 +344,13 @@ export const Inventory: React.FC = () => {
             </p>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              {formError && (
+                <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-600 border border-rose-100 flex items-center space-x-2">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* Book Title */}
@@ -428,13 +466,18 @@ export const Inventory: React.FC = () => {
                       Price ($)
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       value={price}
-                      onChange={(e) => setPrice(Math.max(0, Number(e.target.value)))}
-                      className="block w-full rounded-lg border border-slate-200 py-2 px-3 text-sm focus:border-indigo-550 focus:outline-none shadow-sm"
-                      min={0}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className={`block w-full rounded-lg border ${fieldErrors.price ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-indigo-550'} py-2 px-3 text-sm focus:outline-none shadow-sm`}
                       required
                     />
+                    {fieldErrors.price && (
+                      <p className="mt-1.5 text-[11px] font-medium text-rose-600 flex items-center">
+                        <X className="h-3 w-3 mr-1" />
+                        {fieldErrors.price}
+                      </p>
+                    )}
                   </div>
                 )}
 

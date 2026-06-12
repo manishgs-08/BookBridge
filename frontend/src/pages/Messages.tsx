@@ -60,59 +60,42 @@ export const Messages: React.FC = () => {
         return Array.isArray(response.data) ? response.data : (response.data.conversations || []);
       } catch (err) {
         console.error(err);
-        // Fallback mock conversations
-        const mockConvs: Conversation[] = [
-          {
-            _id: 'conv1',
-            participants: [
-              { _id: 'myuser', name: 'Me' },
-              { _id: 'owner1', name: 'Sarah Miller' }
-            ],
-            book: { _id: 'book1', title: 'Introduction to Algorithms (CLRS)', price: 45, type: 'Sell' },
-            lastMessage: {
-              content: 'Is $40 still good for you? I can meet tomorrow near the library.',
-              createdAt: new Date().toISOString()
-            }
-          }
-        ];
-
-        // If deep linked, add a pending mockup
-        if (queryUserId && queryBookId && !mockConvs.some(c => c.book._id === queryBookId)) {
-          mockConvs.unshift({
-            _id: 'conv_pending',
-            participants: [
-              { _id: 'myuser', name: 'Me' },
-              { _id: queryUserId, name: 'Book Owner' }
-            ],
-            book: { _id: queryBookId, title: 'Selected Textbook', price: 0, type: 'Exchange' },
-            lastMessage: {
-              content: 'Starting a new conversation regarding this book...',
-              createdAt: new Date().toISOString()
-            }
-          });
-        }
-        return mockConvs;
+        throw err;
       }
-    }
+    },
+    refetchInterval: 4000,
   });
+
+  // Create derived conversations list that injects a pending conversation if needed
+  const displayConversations = React.useMemo(() => {
+    if (!conversations) return undefined;
+    
+    // If URL has params but we don't have an existing conversation for this book
+    if (queryUserId && queryBookId && !conversations.some(c => String(c.book._id) === String(queryBookId))) {
+      const pendingConv: Conversation = {
+        _id: 'conv_pending',
+        participants: [{ _id: queryUserId, name: 'Seller' }], // Placeholder until real data loads via send
+        book: { _id: queryBookId, title: 'Textbook Inquiry', price: 0, type: 'Inquiry' }
+      };
+      return [pendingConv, ...conversations];
+    }
+    
+    return conversations;
+  }, [conversations, queryUserId, queryBookId]);
 
   // Select initial conversation
   useEffect(() => {
-    if (conversations && conversations.length > 0 && !selectedConvId) {
+    if (displayConversations && displayConversations.length > 0 && !selectedConvId) {
       if (queryBookId) {
-        const matchingConv = conversations.find(c => c.book._id === queryBookId);
+        const matchingConv = displayConversations.find(c => String(c.book._id) === String(queryBookId));
         if (matchingConv) {
           setSelectedConvId(matchingConv._id);
-        } else {
-          // If queryBookId exists but not in list, select the pending conversation we added
-          const pendingConv = conversations.find(c => c._id === 'conv_pending');
-          if (pendingConv) setSelectedConvId(pendingConv._id);
         }
       } else {
-        setSelectedConvId(conversations[0]._id);
+        setSelectedConvId(displayConversations[0]._id);
       }
     }
-  }, [conversations, selectedConvId, queryBookId]);
+  }, [displayConversations, selectedConvId, queryBookId]);
 
   // Fetch messages for active conversation
   const { data: messages, isLoading: isMessagesLoading, refetch: refetchMessages } = useQuery<Message[]>({
@@ -126,29 +109,10 @@ export const Messages: React.FC = () => {
         const response = await api.get(`/messages/${selectedConvId}`);
         return Array.isArray(response.data) ? response.data : (response.data.messages || []);
       } catch (err) {
-        // Fallback mock messages
-        return [
-          {
-            _id: 'm1',
-            sender: 'owner1',
-            content: 'Hi! Yes, the algorithms textbook is still available.',
-            createdAt: new Date(Date.now() - 3600000).toISOString()
-          },
-          {
-            _id: 'm2',
-            sender: 'myuser',
-            content: 'Great! Would you take $40 for it?',
-            createdAt: new Date(Date.now() - 1800000).toISOString()
-          },
-          {
-            _id: 'm3',
-            sender: 'owner1',
-            content: 'Is $40 still good for you? I can meet tomorrow near the library.',
-            createdAt: new Date().toISOString()
-          }
-        ];
+        throw err;
       }
-    }
+    },
+    refetchInterval: 4000,
   });
 
   // Scroll to bottom on message load
@@ -159,8 +123,8 @@ export const Messages: React.FC = () => {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
-      const activeConv = conversations?.find(c => c._id === selectedConvId);
-      const receiver = activeConv?.participants.find(p => p._id !== 'myuser' && p._id !== user?.id);
+      const activeConv = displayConversations?.find(c => c._id === selectedConvId);
+      const receiver = activeConv?.participants.find(p => String(p._id) !== 'myuser' && String(p._id) !== String(user?.user_id));
       const bookId = activeConv?.book._id;
 
       const payload = {
@@ -184,10 +148,8 @@ export const Messages: React.FC = () => {
         refetchMessages();
       }
     },
-    onError: () => {
-      // Mock local update if offline sandbox
-      alert('Message sent successfully (offline test mode)!');
-      setNewMessage('');
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Failed to send message.');
     }
   });
 
@@ -198,14 +160,15 @@ export const Messages: React.FC = () => {
   };
 
   const getOtherParticipant = (conv: Conversation) => {
-    return conv.participants.find(p => p._id !== 'myuser' && p._id !== user?.id) || { _id: 'unknown', name: 'Unknown Student' };
+    return conv.participants.find(p => String(p._id) !== 'myuser' && String(p._id) !== String(user?.user_id)) || { _id: 'unknown', name: 'Unknown Student' };
   };
 
-  const activeConv = conversations?.find(c => c._id === selectedConvId);
+  const activeConv = displayConversations?.find(c => c._id === selectedConvId);
   const partner = activeConv ? getOtherParticipant(activeConv) : null;
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden h-[75vh] flex">
+    <div className="space-y-4">
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden h-[75vh] flex">
       {/* Left Conversations panel */}
       <div className="w-1/3 border-r border-slate-200 flex flex-col">
         <div className="p-4 border-b border-slate-150">
@@ -219,12 +182,12 @@ export const Messages: React.FC = () => {
               <div className="h-12 bg-slate-200 rounded-xl"></div>
               <div className="h-12 bg-slate-200 rounded-xl"></div>
             </div>
-          ) : isConvsError || conversations?.length === 0 ? (
+          ) : isConvsError || displayConversations?.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-400">
               No conversations active. Message a seller on their textbook listing page to start a chat.
             </div>
           ) : (
-            conversations?.map((conv) => {
+            displayConversations?.map((conv) => {
               const other = getOtherParticipant(conv);
               const isSelected = conv._id === selectedConvId;
               return (
@@ -297,16 +260,18 @@ export const Messages: React.FC = () => {
                 </div>
               ) : (
                 messages?.map((msg) => {
-                  const isMe = msg.sender === 'myuser' || msg.sender === user?.id;
+                  const isMe = String(msg.sender) === 'myuser' || String(msg.sender) === String(user?.user_id);
                   return (
                     <div key={msg._id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-md rounded-2xl p-3 px-4 text-xs shadow-sm ${
                         isMe 
-                          ? 'bg-indigo-650 text-white rounded-br-none' 
+                          ? 'bg-primary-600 text-white rounded-br-none' 
                           : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
                       }`}>
-                        <p className="leading-relaxed">{msg.content}</p>
-                        <span className={`text-[8px] block text-right mt-1 ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>
+                        <p className={`leading-relaxed ${!(msg.content || (msg as any).message || (msg as any).text) ? 'italic opacity-50' : ''}`}>
+                          {msg.content || (msg as any).message || (msg as any).text || "Unsupported content"}
+                        </p>
+                        <span className={`text-[8px] block text-right mt-1 ${isMe ? 'text-primary-200' : 'text-slate-400'}`}>
                           {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
@@ -321,15 +286,16 @@ export const Messages: React.FC = () => {
             <form onSubmit={handleSend} className="p-4 border-t border-slate-200 bg-white flex gap-3 items-center">
               <input
                 type="text"
+                placeholder="Type a message..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type your message about the textbook swap..."
-                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-4 text-xs focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-550 transition shadow-sm"
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-4 text-xs focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 transition shadow-sm"
+                disabled={sendMessageMutation.isPending}
               />
               <button
                 type="submit"
-                disabled={sendMessageMutation.isPending || !newMessage.trim()}
-                className="h-10 w-10 rounded-full bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-550 transition disabled:opacity-50 flex-shrink-0"
+                disabled={!newMessage.trim() || sendMessageMutation.isPending}
+                className="h-10 w-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-500 transition disabled:opacity-50 flex-shrink-0"
               >
                 <Send className="h-4.5 w-4.5" />
               </button>
@@ -341,6 +307,7 @@ export const Messages: React.FC = () => {
             <p className="text-xs">Select a conversation from the sidebar to chat</p>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

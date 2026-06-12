@@ -9,7 +9,8 @@ import {
   ShieldAlert, 
   Check, 
   MessageSquare,
-  X
+  X,
+  BadgeCheck
 } from 'lucide-react';
 import api from '../api/axios';
 
@@ -24,10 +25,10 @@ interface Review {
 }
 
 export const Profile: React.FC = () => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, login } = useAuth();
 
   // Form profile states
-  const [name, setName] = useState(user?.name || '');
+  const [name, setName] = useState(user?.user_name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -38,33 +39,22 @@ export const Profile: React.FC = () => {
   const [rateComment, setRateComment] = useState('');
   const [rateModalOpen, setRateModalOpen] = useState(false);
 
+  // Seller verification state
+  const [usn, setUsn] = useState('');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifySuccess, setVerifySuccess] = useState<boolean>(false);
+
   // Fetch reviews for the current user
   const { data: reviews, isLoading: isReviewsLoading } = useQuery<Review[]>({
-    queryKey: ['reviews', user?.id],
-    enabled: !!user?.id,
+    queryKey: ['reviews', user?.user_id],
+    enabled: !!user?.user_id,
     queryFn: async () => {
       try {
-        const response = await api.get(`/reviews/${user?.id}`);
+        const response = await api.get(`/reviews/${user?.user_id}`);
         return Array.isArray(response.data) ? response.data : (response.data.reviews || []);
       } catch (err) {
         console.error(err);
-        // Fallback mock reviews
-        return [
-          {
-            _id: 'rev1',
-            reviewer: { name: 'Sarah Miller' },
-            rating: 5,
-            comment: 'Very friendly, book was in the exact condition listed. Meetup was quick and smooth!',
-            createdAt: new Date().toISOString()
-          },
-          {
-            _id: 'rev2',
-            reviewer: { name: 'Bob Harris' },
-            rating: 4,
-            comment: 'Punctual meeting on campus. Recommended trader.',
-            createdAt: new Date(Date.now() - 604800000).toISOString()
-          }
-        ];
+        throw err;
       }
     }
   });
@@ -111,6 +101,38 @@ export const Profile: React.FC = () => {
     }
   });
 
+  // Seller verification mutation
+  const verifyMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/auth/verify-seller', { usn });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data) {
+        const { token, user: newUser } = data.data;
+        login(token, newUser); // Replaces context immediately
+        setUsn('');
+        setVerifyError(null);
+        setVerifySuccess(true);
+      }
+    },
+    onError: (err: any) => {
+      const status = err.response?.status;
+      const backendMessage = err.response?.data?.message;
+      let uiMessage = backendMessage || 'Something went wrong';
+      
+      switch (status) {
+        case 400: uiMessage = backendMessage || 'Invalid USN format'; break;
+        case 401: uiMessage = backendMessage || 'Please login again'; break;
+        case 403: uiMessage = backendMessage || 'Verification not permitted'; break;
+        case 409: uiMessage = backendMessage || 'USN already claimed'; break;
+        case 429: uiMessage = backendMessage || 'Too many attempts. Try later'; break;
+        case 500: uiMessage = backendMessage || 'Something went wrong'; break;
+      }
+      setVerifyError(uiMessage);
+    }
+  });
+
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     profileMutation.mutate();
@@ -121,6 +143,36 @@ export const Profile: React.FC = () => {
     if (!rateUserId) return;
     peerReviewMutation.mutate();
   };
+
+  const handleVerifySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerifyError(null);
+    
+    const normalizedUsn = usn.toUpperCase().trim();
+
+    // Frontend validation just for UX (backend is source of truth)
+    if (!/^4SO\d{2}[A-Z]{2}\d{3}$/.test(normalizedUsn)) {
+      setVerifyError('Invalid USN format. Expected: 4SO24CS001');
+      return;
+    }
+
+    // Cross-validate admission year between email and USN
+    const emailMatch = user?.email?.match(/^(\d{2})/);
+    const usnMatch = normalizedUsn.match(/^4SO(\d{2})/i);
+    const emailYear = emailMatch?.[1];
+    const usnYear = usnMatch?.[1];
+
+    if (emailYear && usnYear && emailYear !== usnYear) {
+      setVerifyError(`USN admission year (${usnYear}) does not match your SJEC email year (${emailYear}).`);
+      return;
+    }
+    
+    verifyMutation.mutate();
+  };
+
+  // Seller verification visibility logic
+  const isSjecEmail = user?.email?.toLowerCase().endsWith('@sjec.ac.in') ?? false;
+  const canVerifySeller = isSjecEmail && user?.role === 'buyer' && user?.seller_verified === false;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -218,6 +270,101 @@ export const Profile: React.FC = () => {
           </form>
         </div>
 
+        {/* Seller Verification Section — prominent, in main content area */}
+        {verifySuccess && (
+          <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 md:p-8 shadow-sm">
+            <div className="flex items-start space-x-4">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                <BadgeCheck className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h2 className="font-display text-lg font-bold text-emerald-900">
+                  Seller verification successful.
+                </h2>
+                <p className="mt-1 text-sm text-emerald-700">
+                  You can now create and manage textbook listings.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        {!verifySuccess && canVerifySeller && (
+          <div className="rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-white p-6 md:p-8 shadow-sm">
+            <div className="flex items-start space-x-4">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                <BadgeCheck className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h2 className="font-display text-lg font-bold text-slate-900">
+                  Become a Verified Seller
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Verify your SJEC account using your USN to start listing textbooks.
+                </p>
+
+                {verifyError && (
+                  <div className="mt-4 flex items-center space-x-2 rounded-lg bg-rose-50 p-3 text-xs text-rose-600 border border-rose-100">
+                    <ShieldAlert className="h-4 w-4 flex-shrink-0" />
+                    <span>{verifyError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleVerifySubmit} className="mt-5">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={usn}
+                        onChange={(e) => {
+                          setUsn(e.target.value.toUpperCase());
+                          if (verifyError) setVerifyError(null);
+                        }}
+                        placeholder="e.g. 4SO24CS001"
+                        className="block w-full rounded-lg border border-slate-200 bg-white py-2.5 px-3 text-sm font-mono uppercase focus:border-indigo-500 focus:outline-none shadow-sm"
+                        required
+                      />
+                      <p className="mt-1.5 text-[10px] text-slate-400 font-medium">Format: 4SO24CS001</p>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={verifyMutation.isPending}
+                      className="self-start rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-2.5 text-sm font-semibold text-white hover:from-indigo-700 hover:to-indigo-600 transition flex items-center justify-center space-x-2 disabled:opacity-60"
+                    >
+                      {verifyMutation.isPending ? (
+                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <BadgeCheck className="h-4 w-4" />
+                          <span>Verify as Seller</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Non-SJEC users: informational message */}
+        {!isSjecEmail && user?.role === 'buyer' && !user?.seller_verified && (
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 md:p-8 shadow-sm">
+            <div className="flex items-start space-x-4">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-500">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="font-display text-lg font-bold text-slate-700">
+                  Seller Verification Unavailable
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Only users with an <span className="font-semibold">@sjec.ac.in</span> email address can become verified sellers.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Reviews Lists */}
         <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
           <h2 className="font-display text-lg font-bold text-slate-900 mb-6">
@@ -260,9 +407,9 @@ export const Profile: React.FC = () => {
       <div className="lg:col-span-1 space-y-6">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm text-center flex flex-col items-center">
           <div className="h-20 w-20 rounded-full bg-indigo-50 text-indigo-650 flex items-center justify-center font-bold font-display text-2xl border border-indigo-100 shadow-inner">
-            {user?.name.substring(0, 2).toUpperCase()}
+            {(user?.user_name || '').substring(0, 2).toUpperCase()}
           </div>
-          <h3 className="mt-4 font-display font-extrabold text-slate-900 text-lg leading-tight">{user?.name}</h3>
+          <h3 className="mt-4 font-display font-extrabold text-slate-900 text-lg leading-tight">{user?.user_name}</h3>
           <p className="text-xs text-slate-500">{user?.email}</p>
 
           <div className="mt-6 w-full border-t border-slate-100 pt-6 space-y-4">
@@ -281,6 +428,26 @@ export const Profile: React.FC = () => {
                 <span className="text-slate-450 font-bold uppercase tracking-wide">User Role</span>
                 <span className="bg-rose-50 text-rose-700 border border-rose-100 font-bold px-2.5 py-0.5 rounded text-[10px]">
                   Administrator
+                </span>
+              </div>
+            )}
+            
+            {/* Seller status indicator in sidebar */}
+            {user?.role === 'seller' && user?.seller_verified && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-450 font-bold uppercase tracking-wide">Seller</span>
+                <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold px-2.5 py-0.5 rounded text-[10px] flex items-center space-x-1">
+                  <BadgeCheck className="h-3 w-3" />
+                  <span>Verified</span>
+                </span>
+              </div>
+            )}
+
+            {canVerifySeller && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-450 font-bold uppercase tracking-wide">Seller</span>
+                <span className="bg-amber-50 text-amber-700 border border-amber-100 font-bold px-2.5 py-0.5 rounded text-[10px]">
+                  Not Verified
                 </span>
               </div>
             )}
@@ -399,6 +566,7 @@ export const Profile: React.FC = () => {
           </div>
         </div>
       )}
+
 
     </div>
   );

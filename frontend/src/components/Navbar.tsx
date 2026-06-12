@@ -26,7 +26,7 @@ interface Notification {
 }
 
 export const Navbar: React.FC = () => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, isVerifiedSeller } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -48,27 +48,7 @@ export const Navbar: React.FC = () => {
         setUnreadCount(list.filter((n: Notification) => !n.isRead).length);
       } catch (err) {
         console.error('Failed to fetch notifications:', err);
-        // Fallback mock notifications for demonstration if endpoint isn't fully active
-        const mockList: Notification[] = [
-          {
-            _id: '1',
-            user: user?.id || '1',
-            type: 'message',
-            message: 'You have a new message from Sarah about "Chemistry 101"',
-            isRead: false,
-            createdAt: new Date().toISOString()
-          },
-          {
-            _id: '2',
-            user: user?.id || '1',
-            type: 'request',
-            message: 'Your request for "Introduction to Algorithms" was approved!',
-            isRead: false,
-            createdAt: new Date(Date.now() - 3600000).toISOString()
-          }
-        ];
-        setNotifications(mockList);
-        setUnreadCount(mockList.filter(n => !n.isRead).length);
+        throw err;
       }
     };
 
@@ -85,11 +65,7 @@ export const Navbar: React.FC = () => {
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
-      // Offline fallback
-      setNotifications(prev => 
-        prev.map(n => n._id === id ? { ...n, isRead: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      console.error('Failed to mark notification read', err);
     }
   };
 
@@ -99,8 +75,7 @@ export const Navbar: React.FC = () => {
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (err) {
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      setUnreadCount(0);
+      console.error('Failed to mark all notifications read', err);
     }
   };
 
@@ -131,14 +106,16 @@ export const Navbar: React.FC = () => {
               >
                 Marketplace
               </Link>
-              <Link 
-                to="/inventory" 
-                className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
-                  isActive('/inventory') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                }`}
-              >
-                My Inventory
-              </Link>
+              {isVerifiedSeller && (
+                <Link 
+                  to="/inventory" 
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                    isActive('/inventory') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  My Inventory
+                </Link>
+              )}
               <Link 
                 to="/wishlist" 
                 className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
@@ -252,18 +229,18 @@ export const Navbar: React.FC = () => {
                 {/* Profile Link & Logout */}
                 <div className="flex items-center space-x-3 pl-2 border-l border-slate-200">
                   <Link to="/profile" className="flex items-center space-x-2 text-slate-700 hover:text-slate-950 transition">
-                    {user?.profilePicture ? (
+                    {user?.profile_picture ? (
                       <img 
-                        src={user.profilePicture} 
-                        alt={user.name} 
+                        src={user.profile_picture} 
+                        alt={user.user_name} 
                         className="h-8 w-8 rounded-full border object-cover" 
                       />
                     ) : (
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 font-display text-xs font-bold text-white">
-                        {user?.name ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+                        {user?.user_name ? user.user_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
                       </div>
                     )}
-                    <span className="text-sm font-semibold max-w-[100px] truncate">{user?.name}</span>
+                    <span className="text-sm font-semibold max-w-[100px] truncate">{user?.user_name}</span>
                   </Link>
                   <button 
                     onClick={() => {
@@ -314,10 +291,10 @@ export const Navbar: React.FC = () => {
             <>
               <div className="flex items-center space-x-3 pb-3 border-b border-slate-100">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
-                  {user?.name ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+                  {user?.user_name ? user.user_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
                 </div>
                 <div>
-                  <h4 className="font-display text-sm font-bold text-slate-900">{user?.name}</h4>
+                  <h4 className="font-display text-sm font-bold text-slate-900">{user?.user_name}</h4>
                   <p className="text-xs text-slate-500">{user?.email}</p>
                 </div>
               </div>
@@ -329,13 +306,15 @@ export const Navbar: React.FC = () => {
                 >
                   <BookOpen className="h-4 w-4" /> <span>Marketplace</span>
                 </Link>
-                <Link 
-                  to="/inventory" 
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center space-x-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <List className="h-4 w-4" /> <span>My Inventory</span>
-                </Link>
+                {isVerifiedSeller && (
+                  <Link 
+                    to="/inventory" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center space-x-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <List className="h-4 w-4" /> <span>My Inventory</span>
+                  </Link>
+                )}
                 <Link 
                   to="/wishlist" 
                   onClick={() => setMobileMenuOpen(false)}

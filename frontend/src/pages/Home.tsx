@@ -20,7 +20,7 @@ interface Book {
     name: string;
     rating?: number;
   };
-  status: 'Available' | 'Pending' | 'Exchanged' | 'Sold';
+  status: 'Available' | 'Reserved' | 'Exchanged' | 'Sold';
   createdAt: string;
 }
 
@@ -54,10 +54,13 @@ const TYPES = [
   { label: 'Free', value: 'Free' }
 ];
 
+const STATUSES = ['All Books', 'Available', 'Reserved', 'Sold'];
+
 export const Home: React.FC = () => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All Categories');
   const [condition, setCondition] = useState('All Conditions');
+  const [status, setStatus] = useState('All Books');
   const [type, setType] = useState('');
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
 
@@ -87,24 +90,21 @@ export const Home: React.FC = () => {
         setWishlistIds(prev => [...prev, bookId]);
       }
     } catch (err) {
-      // Toggle locally for demo UI flow
-      if (wishlistIds.includes(bookId)) {
-        setWishlistIds(prev => prev.filter(id => id !== bookId));
-      } else {
-        setWishlistIds(prev => [...prev, bookId]);
-      }
+      console.error('Failed to update wishlist:', err);
+      // Optional: show a toast or alert to the user here
     }
   };
 
   // Fetch books matching criteria
   const { data: books, isLoading, isError, refetch } = useQuery<Book[]>({
-    queryKey: ['books', search, category, condition, type],
+    queryKey: ['books', search, category, condition, type, status],
     queryFn: async () => {
       const params: any = {};
       if (search) params.search = search;
       if (category !== 'All Categories') params.category = category;
       if (condition !== 'All Conditions') params.condition = condition;
       if (type) params.type = type;
+      if (status !== 'All Books') params.status = status;
 
       try {
         const response = await api.get('/books', { params });
@@ -112,75 +112,7 @@ export const Home: React.FC = () => {
         return Array.isArray(response.data) ? response.data : (response.data.books || []);
       } catch (err) {
         console.error('Failed to fetch books from backend:', err);
-        // Return rich mock dataset for flawless offline sandbox demonstration
-        const mockBooks: Book[] = [
-          {
-            _id: 'book1',
-            title: 'Introduction to Algorithms (CLRS)',
-            author: 'Thomas H. Cormen, Charles E. Leiserson',
-            isbn: '9780262033848',
-            category: 'Computer Science',
-            condition: 'Very Good',
-            price: 45,
-            type: 'Sell',
-            owner: { _id: 'owner1', name: 'John Doe', rating: 4.8 },
-            status: 'Available',
-            image: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=400',
-            createdAt: new Date().toISOString()
-          },
-          {
-            _id: 'book2',
-            title: 'Calculus: Early Transcendentals',
-            author: 'James Stewart',
-            isbn: '9781285740621',
-            category: 'Mathematics',
-            condition: 'Like New',
-            price: 0,
-            type: 'Exchange',
-            exchangeFor: 'Linear Algebra and Its Applications',
-            owner: { _id: 'owner2', name: 'Emily Smith', rating: 4.5 },
-            status: 'Available',
-            image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=400',
-            createdAt: new Date(Date.now() - 86400000).toISOString()
-          },
-          {
-            _id: 'book3',
-            title: 'Organic Chemistry',
-            author: 'Marc Loudon, Jim Parise',
-            isbn: '9781936221677',
-            category: 'Chemistry',
-            condition: 'Good',
-            price: 30,
-            type: 'Sell',
-            owner: { _id: 'owner3', name: 'Michael Johnson', rating: 4.2 },
-            status: 'Available',
-            image: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=400',
-            createdAt: new Date(Date.now() - 172800000).toISOString()
-          },
-          {
-            _id: 'book4',
-            title: 'Principles of Microeconomics',
-            author: 'N. Gregory Mankiw',
-            isbn: '9781305155947',
-            category: 'Business & Economics',
-            condition: 'Fair',
-            price: 0,
-            type: 'Free',
-            owner: { _id: 'owner4', name: 'Jessica Davis', rating: 5.0 },
-            status: 'Available',
-            image: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=400',
-            createdAt: new Date(Date.now() - 259200000).toISOString()
-          }
-        ];
-        
-        // Client side filtering for the mock books
-        return mockBooks.filter(b => {
-          if (search && !b.title.toLowerCase().includes(search.toLowerCase()) && !b.author.toLowerCase().includes(search.toLowerCase())) return false;
-          if (category !== 'All Categories' && b.category !== category) return false;
-          if (condition !== 'All Conditions' && b.condition !== condition) return false;
-          if (type && b.type !== type) return false;
-          return true;
-        });
+        throw err;
       }
     }
   });
@@ -261,6 +193,26 @@ export const Home: React.FC = () => {
                     }`}
                   >
                     {cond}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div className="mt-6 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Status</label>
+              <div className="grid grid-cols-1 gap-1">
+                {STATUSES.map((stat) => (
+                  <button
+                    key={stat}
+                    onClick={() => setStatus(stat)}
+                    className={`text-left text-sm px-3 py-2 rounded-lg transition ${
+                      status === stat 
+                        ? 'bg-indigo-50 text-indigo-700 font-semibold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                  >
+                    {stat}
                   </button>
                 ))}
               </div>
@@ -375,15 +327,32 @@ export const Home: React.FC = () => {
                       <img 
                         src={book.image} 
                         alt={book.title} 
-                        className="h-full w-full object-cover group-hover:scale-105 transition duration-500"
+                        className={`h-full w-full object-cover group-hover:scale-105 transition duration-500 ${
+                          book.status !== 'Available' ? 'opacity-80 grayscale-[20%]' : ''
+                        }`}
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-slate-350">
+                      <div className={`flex h-full w-full items-center justify-center text-slate-350 ${
+                        book.status !== 'Available' ? 'opacity-80 grayscale-[20%]' : ''
+                      }`}>
                         <BookOpen className="h-10 w-10" />
                       </div>
                     )}
+                    
+                    {/* Status Badges */}
+                    {book.status === 'Sold' && (
+                      <span className="absolute top-3 left-3 bg-red-600 text-white text-[10px] font-bold uppercase px-2.5 py-1 rounded-md shadow z-10">
+                        Sold
+                      </span>
+                    )}
+                    {book.status === 'Reserved' && (
+                      <span className="absolute top-3 left-3 bg-amber-500 text-white text-[10px] font-bold uppercase px-2.5 py-1 rounded-md shadow z-10">
+                        Reserved
+                      </span>
+                    )}
+
                     {/* Floating badge for trade type */}
-                    <span className={`absolute left-3 bottom-3 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md shadow ${
+                    <span className={`absolute left-3 bottom-3 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md shadow z-10 ${
                       book.type === 'Sell' 
                         ? 'bg-emerald-500 text-white' 
                         : book.type === 'Exchange' 

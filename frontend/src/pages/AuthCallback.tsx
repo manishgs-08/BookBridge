@@ -44,17 +44,7 @@ export const AuthCallback: React.FC = () => {
         const dbUser = dataPayload?.user;
 
         if (token && dbUser) {
-          // Map backend DB snake_case fields to frontend camelCase fields
-          const user = {
-            id: String(dbUser.user_id),
-            name: dbUser.user_name || '',
-            email: dbUser.email || '',
-            role: dbUser.role || 'buyer',
-            profilePicture: dbUser.profile_picture,
-            rating: dbUser.rating,
-            createdAt: dbUser.created_at,
-          };
-          login(token, user as any);
+          login(token, dbUser);
           navigate('/');
         } else {
           throw new Error('Authentication response is missing token or user data.');

@@ -27,8 +27,8 @@ const mapBookToFrontend = (book) => {
     exchangeFor: book.exchange_for || '',
     image: book.image_url || '',
     status: book.status === 'available' ? 'Available' : 
-            book.status === 'reserved' ? 'Pending' : 
-            book.status === 'sold' ? 'Sold' : 'Sold',
+            book.status === 'reserved' ? 'Reserved' : 
+            book.status === 'sold' ? 'Sold' : 'Removed',
     owner: {
       _id: String(book.seller_id),
       name: book.seller_name || '',
@@ -151,7 +151,7 @@ const getBooks = async (filters) => {
     type,
     minPrice,
     maxPrice,
-    status = BOOK_STATUS.AVAILABLE,
+    status = 'All Books',
     page = PAGINATION.DEFAULT_PAGE,
     limit = PAGINATION.DEFAULT_LIMIT,
   } = filters;
@@ -160,8 +160,20 @@ const getBooks = async (filters) => {
   const queryLimit = Math.min(parseInt(limit, 10), PAGINATION.MAX_LIMIT);
   const offset = (parseInt(page, 10) - 1) * queryLimit;
 
-  let whereClauses = ['b.status = ?'];
-  let queryParams = [status];
+  let whereClauses = [];
+  let queryParams = [];
+
+  if (status === 'All Books') {
+    whereClauses.push("b.status IN ('available', 'reserved', 'sold')");
+  } else {
+    // Map Frontend status text to DB enum
+    let dbStatus = BOOK_STATUS.AVAILABLE;
+    if (status === 'Reserved') dbStatus = 'reserved';
+    if (status === 'Sold') dbStatus = 'sold';
+    
+    whereClauses.push('b.status = ?');
+    queryParams.push(dbStatus);
+  }
 
   // Search
   if (searchQuery) {

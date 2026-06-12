@@ -1,14 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/axios';
 
+export type UserRole = 'buyer' | 'seller' | 'admin';
+
 export interface User {
-  id: string;
-  name: string;
+  user_id: number;
+  user_name: string;
   email: string;
-  role: 'student' | 'admin';
-  profilePicture?: string;
+  role: UserRole;
+  seller_verified: boolean;
+  profile_picture?: string;
+  usn?: string | null;
   rating?: number;
-  createdAt?: string;
+  created_at?: string;
 }
 
 interface AuthContextType {
@@ -19,6 +23,7 @@ interface AuthContextType {
   login: (token: string, user: User) => void;
   logout: () => void;
   updateUser: (updatedUser: Partial<User>) => void;
+  isVerifiedSeller: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,17 +47,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const response = await api.get('/auth/me');
           const dbUser = response.data?.data;
           if (dbUser) {
-            const mappedUser = {
-              id: String(dbUser.user_id),
-              name: dbUser.user_name || '',
-              email: dbUser.email || '',
-              role: dbUser.role || 'buyer',
-              profilePicture: dbUser.profile_picture,
-              rating: dbUser.rating,
-              createdAt: dbUser.created_at,
+            // Normalize MySQL boolean fields (MySQL returns 0/1, not true/false)
+            const normalizedUser: User = {
+              ...dbUser,
+              seller_verified: Boolean(dbUser.seller_verified),
             };
-            setUser(mappedUser as any);
-            localStorage.setItem('bookbridge_user', JSON.stringify(mappedUser));
+            setUser(normalizedUser);
+            localStorage.setItem('bookbridge_user', JSON.stringify(normalizedUser));
           }
         } catch (error) {
           console.error('Failed to verify token', error);
@@ -67,10 +68,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = (newToken: string, newUser: User) => {
+    // Normalize MySQL boolean fields (MySQL returns 0/1, not true/false)
+    const normalizedUser: User = {
+      ...newUser,
+      seller_verified: Boolean(newUser.seller_verified),
+    };
     localStorage.setItem('bookbridge_token', newToken);
-    localStorage.setItem('bookbridge_user', JSON.stringify(newUser));
+    localStorage.setItem('bookbridge_user', JSON.stringify(normalizedUser));
     setToken(newToken);
-    setUser(newUser);
+    setUser(normalizedUser);
   };
 
   const logout = () => {
@@ -89,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAuthenticated = !!token;
+  const isVerifiedSeller = user?.role === 'seller' && user?.seller_verified === true;
 
   return (
     <AuthContext.Provider
@@ -100,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         updateUser,
+        isVerifiedSeller,
       }}
     >
       {children}

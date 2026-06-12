@@ -13,6 +13,7 @@ import {
   X,
   Plus
 } from 'lucide-react';
+import { BackButton } from '../components/BackButton';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -33,7 +34,7 @@ interface Book {
     rating?: number;
     email: string;
   };
-  status: 'Available' | 'Pending' | 'Exchanged' | 'Sold';
+  status: 'Available' | 'Reserved' | 'Exchanged' | 'Sold';
   description?: string;
   createdAt: string;
 }
@@ -66,46 +67,8 @@ export const BookDetails: React.FC = () => {
         const response = await api.get(`/books/${id}`);
         return response.data;
       } catch (err) {
-        console.error('Failed to fetch book from server, fallback to sandbox details', err);
-        // Fallback demo data
-        const mockBooks: Record<string, Book> = {
-          book1: {
-            _id: 'book1',
-            title: 'Introduction to Algorithms (CLRS)',
-            author: 'Thomas H. Cormen, Charles E. Leiserson',
-            isbn: '9780262033848',
-            category: 'Computer Science',
-            condition: 'Very Good',
-            price: 45,
-            type: 'Sell',
-            owner: { _id: 'owner1', name: 'John Doe', rating: 4.8, email: 'john.doe@university.edu' },
-            status: 'Available',
-            description: 'This is the standard algorithms textbook. Minor highlighting on a few pages but otherwise in great condition. No torn pages.',
-            image: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=400',
-            createdAt: new Date().toISOString()
-          },
-          book2: {
-            _id: 'book2',
-            title: 'Calculus: Early Transcendentals',
-            author: 'James Stewart',
-            isbn: '9781285740621',
-            category: 'Mathematics',
-            condition: 'Like New',
-            price: 0,
-            type: 'Exchange',
-            exchangeFor: 'Linear Algebra and Its Applications',
-            owner: { _id: 'owner2', name: 'Emily Smith', rating: 4.5, email: 'emily@university.edu' },
-            status: 'Available',
-            description: 'Used for Calc I and II. No highlights, no markings. Like new condition. Willing to exchange for Linear Algebra.',
-            image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=400',
-            createdAt: new Date(Date.now() - 86400000).toISOString()
-          }
-        };
-
-        if (id && mockBooks[id]) {
-          return mockBooks[id];
-        }
-        throw new Error('Book not found');
+        console.error('Failed to fetch book from server:', err);
+        throw err;
       }
     }
   });
@@ -134,11 +97,7 @@ export const BookDetails: React.FC = () => {
         const list = Array.isArray(response.data) ? response.data : (response.data.books || []);
         setUserInventory(list);
       } catch (err) {
-        // Fallback mock items
-        setUserInventory([
-          { _id: 'mybook1', title: 'Linear Algebra and Its Applications', author: 'David C. Lay' },
-          { _id: 'mybook2', title: 'Physics for Scientists and Engineers', author: 'Serway & Jewett' }
-        ]);
+        throw err;
       }
     };
     fetchInventory();
@@ -249,14 +208,12 @@ export const BookDetails: React.FC = () => {
     );
   }
 
-  const isOwner = user?.id === book.owner._id;
+  const isOwner = user?.user_id != null && String(user.user_id) === String(book.owner._id);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Back button */}
-      <Link to="/" className="inline-flex items-center text-sm font-semibold text-slate-600 hover:text-slate-950 transition">
-        <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Marketplace
-      </Link>
+      <BackButton />
 
       {/* Main Container */}
       <div className="rounded-3xl bg-white border border-slate-200 p-6 md:p-8 shadow-sm">
@@ -367,32 +324,50 @@ export const BookDetails: React.FC = () => {
                   </Link>
                 </div>
               ) : (
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={() => setRequestModalOpen(true)}
-                    disabled={book.status !== 'Available'}
-                    className="flex-1 flex justify-center items-center rounded-xl bg-indigo-650 bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-indigo-750 hover:shadow-premium transition disabled:opacity-50"
-                  >
-                    <span>Request Book</span>
-                  </button>
-                  <button
-                    onClick={handleSendMessage}
-                    className="flex justify-center items-center rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-350 transition"
-                  >
-                    <MessageSquare className="h-4.5 w-4.5 mr-2 text-slate-550" />
-                    <span>Message Owner</span>
-                  </button>
-                  <button
-                    onClick={handleToggleWishlist}
-                    className={`flex items-center justify-center p-3.5 rounded-xl border transition ${
-                      wishlistIds.includes(book._id) 
-                        ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100' 
-                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-rose-600'
-                    }`}
-                    title={wishlistIds.includes(book._id) ? "Remove from wishlist" : "Add to wishlist"}
-                  >
-                    <Heart className={`h-5 w-5 ${wishlistIds.includes(book._id) ? 'fill-rose-500' : ''}`} />
-                  </button>
+                <div className="flex flex-col space-y-3">
+                  {book.status === 'Reserved' && (
+                    <div className="rounded-xl bg-amber-50 p-4 border border-amber-200 text-center">
+                      <p className="text-sm text-amber-800 font-medium">
+                        This book is currently under negotiation and cannot receive new offers.
+                      </p>
+                    </div>
+                  )}
+                  {book.status === 'Sold' && (
+                    <div className="rounded-xl bg-red-50 p-4 border border-red-200 text-center">
+                      <p className="text-sm text-red-800 font-medium">
+                        This book has already been sold.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {book.status === 'Available' && (
+                      <button
+                        onClick={() => setRequestModalOpen(true)}
+                        className="flex-1 flex justify-center items-center rounded-xl bg-indigo-650 bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-indigo-750 hover:shadow-premium transition"
+                      >
+                        <span>Request Book</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={handleSendMessage}
+                      className="flex-1 sm:flex-none flex justify-center items-center rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-350 transition"
+                    >
+                      <MessageSquare className="h-4.5 w-4.5 mr-2 text-slate-550" />
+                      <span>Message Owner</span>
+                    </button>
+                    <button
+                      onClick={handleToggleWishlist}
+                      className={`flex items-center justify-center p-3.5 rounded-xl border transition ${
+                        wishlistIds.includes(book._id) 
+                          ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100' 
+                          : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-rose-600'
+                      }`}
+                      title={wishlistIds.includes(book._id) ? "Remove from wishlist" : "Add to wishlist"}
+                    >
+                      <Heart className={`h-5 w-5 ${wishlistIds.includes(book._id) ? 'fill-rose-500' : ''}`} />
+                    </button>
+                  </div>
                 </div>
               )}
 
